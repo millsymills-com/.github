@@ -3,51 +3,50 @@
   "description": [
     "Shared Renovate policy for millsymills-com and millsmillsymills. Extend it from a repo with {\"extends\": [\"local>millsymills-com/.github:renovate-config\"]} inside the org, or {\"extends\": [\"github>millsymills-com/.github:renovate-config\"]} from the user account.",
     "Rationale, measurements, and the automerge boundary are in millsymills-com/millsymills-com-org docs/adr/0007-renovate-over-dependabot.md. Change the policy here, not per repo.",
-    "Delete a repo's .github/dependabot.yml when you onboard it. Two bots on one manifest means duplicate PRs and races on the same lockfile. Dependabot *alerts* stay on -- they are declared in tofu and Renovate reads them."
+    "Delete a repo's .github/dependabot.yml when you onboard it. Two bots on one manifest means duplicate PRs and races on the same lockfile. Dependabot *alerts* stay on — they are declared in tofu and Renovate reads them.",
+    "Automerge here only takes effect where a repo has at least one required status check. GitHub offers auto-merge only on a pull request that cannot already be merged, so on a repo with no required check platformAutomerge silently no-ops."
   ],
   "extends": [
     "config:recommended",
     ":semanticCommits",
+    ":enablePreCommit",
     "helpers:pinGitHubActionDigests"
   ],
-  "pre-commit": {
-    "description": "The pre-commit manager is disabled by default and must be opted into, or the pre-commit packageRule below never matches anything.",
-    "enabled": true
-  },
   "timezone": "Etc/UTC",
-  "schedule": ["* 0-5 * * 1"],
+  "schedule": ["* 0-5 * * 1,4"],
   "labels": ["dependencies"],
-  "dependencyDashboard": true,
   "prConcurrentLimit": 5,
   "prHourlyLimit": 2,
   "minimumReleaseAge": "7 days",
   "osvVulnerabilityAlerts": true,
-  "platformAutomerge": true,
   "automergeType": "pr",
   "automergeStrategy": "squash",
   "rebaseWhen": "behind-base-branch",
   "vulnerabilityAlerts": {
     "description": [
-      "Advisory-driven updates skip both the cooldown and the Monday window, because for a known-exploitable version the delay is the risk. They do not skip the human: the 7-day cooldown exists because a freshly published version is when a compromised release is most likely to still be live, so waiving it and the reviewer at once would drop both defenses in the same step."
+      "Advisory-driven updates skip both the cooldown and the twice-weekly window, because for a known-exploitable version the delay is the risk. Schedule immunity comes from this object's default empty schedule, so no schedule key is set here — writing one would overwrite that default and re-impose the window.",
+      "They do not skip the human: the 7-day cooldown exists because a freshly published version is when a compromised release is most likely to still be live, so waiving it and the reviewer at once would drop both defenses in the same step."
     ],
     "enabled": true,
     "minimumReleaseAge": null,
-    "schedule": ["at any time"],
     "automerge": false,
     "labels": ["dependencies", "security"]
   },
   "lockFileMaintenance": {
-    "description": "Monthly `uv lock --upgrade` (and the equivalent for other managers) to refresh transitive pins that no manifest edit would touch. Dependabot has no equivalent; this is the gap that motivated the switch.",
+    "description": [
+      "Refresh transitive pins that no manifest edit would touch (`uv lock --upgrade`, and the equivalent per manager). Twice a month rather than once, so a missed run costs half a month instead of a whole one.",
+      "This is automerged and is a deliberate carve-out from the majors rule: lockFileMaintenance is its own updateType, so the major rule does not match it and a transitive dependency can cross a major inside one of these PRs. It is accepted because the change is confined to the lockfile, no manifest constraint moves, and the repo's required checks are the gate."
+    ],
     "enabled": true,
-    "schedule": ["* 0-5 1 * *"],
+    "schedule": ["* 0-5 1-3 * *"],
     "automerge": true
   },
   "packageRules": [
     {
-      "description": "Majors are never automerged. A grouped merge carried docker/metadata-action v5 to v6 with nobody reading the changelog (resurgent#160); majors get their own PR and a deliberate look.",
+      "description": "Majors are never automerged. A grouped merge carried docker/metadata-action v5 to v6 with nobody reading the changelog (resurgent#160); majors get their own PR and a deliberate look. addLabels, not labels, so a later matching rule cannot drop the marker.",
       "matchUpdateTypes": ["major"],
       "automerge": false,
-      "labels": ["dependencies", "major"]
+      "addLabels": ["major"]
     },
     {
       "description": "Never bump the interpreter floor. Raising requires-python is a support decision, not a dependency update.",
@@ -70,7 +69,7 @@
       "automerge": true
     },
     {
-      "description": "Python runtime dependencies. Kept out of the dev group so a shipped bump is never hidden behind a test-only one -- the split unifi-mcp, unraid-mcp, and gandi-mcp already made by hand.",
+      "description": "Python runtime dependencies. Kept out of the dev group so a shipped bump is never hidden behind a test-only one — the split unifi-mcp, unraid-mcp, and gandi-mcp already made by hand.",
       "matchManagers": ["pep621"],
       "matchDepTypes": ["project.dependencies", "tool.uv.sources"],
       "matchUpdateTypes": ["minor", "patch"],
@@ -85,7 +84,7 @@
       "automerge": true
     },
     {
-      "description": "GitHub Actions. helpers:pinGitHubActionDigests keeps the SHA-pin-with-version-comment shape the workflow convention requires.",
+      "description": "GitHub Actions. helpers:pinGitHubActionDigests keeps the SHA-pin-with-version-comment shape the workflow convention requires. millsymills-com-org overrides this to false in its own renovate.json — an actions bump there trips gate-verified and cannot clear it.",
       "matchManagers": ["github-actions"],
       "matchUpdateTypes": ["minor", "patch", "digest", "pin"],
       "groupName": "github actions",
@@ -117,14 +116,22 @@
       "automerge": false
     },
     {
-      "description": "Terraform and OpenTofu providers are never automerged regardless of update type. A provider bump reaches every repo in the org through the apply pipeline, and the plan output is the review.",
-      "matchManagers": ["terraform", "terraform-version", "tflint-plugin"],
+      "description": "Terraform providers and the tflint plugins. Scoped to the provider depTypes because the terraform manager emits two dozen, most of which are not providers. Grouped for minor and patch only — a provider major must not arrive bundled with routine bumps, which is the resurgent#160 shape. Never automerged: a provider bump reaches every repo in the org through tofu-apply, and the plan output is the review.",
+      "matchManagers": ["terraform", "tflint-plugin"],
+      "matchDepTypes": ["provider", "required_provider"],
+      "matchUpdateTypes": ["minor", "patch"],
       "groupName": "terraform providers",
       "automerge": false
     },
     {
-      "description": "Astral tools move fast at 0.x and a minor there can change lint or type behavior. Still automerged -- the failure mode is a red Lint & Format or Type Check on the PR, which blocks the merge rather than landing it.",
-      "matchPackageNames": ["ruff", "ty", "uv"],
+      "description": "Astral tools move fast at 0.x and a minor there can change lint or type behavior. Still automerged — the failure mode is a red lint or type check on the PR, which blocks the merge rather than landing it. Names are matched as packageName, so the pre-commit hook repos are listed separately from the PyPI distributions.",
+      "matchPackageNames": [
+        "ruff",
+        "ty",
+        "uv",
+        "astral-sh/ruff-pre-commit",
+        "astral-sh/uv-pre-commit"
+      ],
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "python dev dependencies",
       "automerge": true
