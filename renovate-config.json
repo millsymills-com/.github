@@ -106,6 +106,13 @@
       "automerge": true
     },
     {
+      "description": "Go modules are grouped but not automerged. The one Go repo in the fleet gates on a single `test` check, which is too thin to land a dependency bump unattended. Flip this to true once it also runs vet and a linter.",
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "go modules",
+      "automerge": false
+    },
+    {
       "description": "Terraform and OpenTofu providers are never automerged regardless of update type. A provider bump reaches every repo in the org through the apply pipeline, and the plan output is the review.",
       "matchManagers": ["terraform", "terraform-version", "tflint-plugin"],
       "groupName": "terraform providers",
