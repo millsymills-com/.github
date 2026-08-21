@@ -1,0 +1,122 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": [
+    "Shared Renovate policy for millsymills-com and millsmillsymills. Extend it from a repo with {\"extends\": [\"local>millsymills-com/.github:renovate-config\"]} inside the org, or {\"extends\": [\"github>millsymills-com/.github:renovate-config\"]} from the user account.",
+    "Rationale, measurements, and the automerge boundary are in millsymills-com/millsymills-com-org docs/adr/0007-renovate-over-dependabot.md. Change the policy here, not per repo.",
+    "Delete a repo's .github/dependabot.yml when you onboard it. Two bots on one manifest means duplicate PRs and races on the same lockfile. Dependabot *alerts* stay on -- they are declared in tofu and Renovate reads them."
+  ],
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "timezone": "Etc/UTC",
+  "schedule": ["* 0-5 * * 1"],
+  "labels": ["dependencies"],
+  "dependencyDashboard": true,
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "minimumReleaseAge": "7 days",
+  "osvVulnerabilityAlerts": true,
+  "platformAutomerge": true,
+  "automergeType": "pr",
+  "automergeStrategy": "squash",
+  "rebaseWhen": "behind-base-branch",
+  "vulnerabilityAlerts": {
+    "description": [
+      "Advisory-driven updates skip both the cooldown and the Monday window, because for a known-exploitable version the delay is the risk. They do not skip the human: the 7-day cooldown exists because a freshly published version is when a compromised release is most likely to still be live, so waiving it and the reviewer at once would drop both defenses in the same step."
+    ],
+    "enabled": true,
+    "minimumReleaseAge": null,
+    "schedule": ["at any time"],
+    "automerge": false,
+    "labels": ["dependencies", "security"]
+  },
+  "lockFileMaintenance": {
+    "description": "Monthly `uv lock --upgrade` (and the equivalent for other managers) to refresh transitive pins that no manifest edit would touch. Dependabot has no equivalent; this is the gap that motivated the switch.",
+    "enabled": true,
+    "schedule": ["* 0-5 1 * *"],
+    "automerge": true
+  },
+  "packageRules": [
+    {
+      "description": "Majors are never automerged. A grouped merge carried docker/metadata-action v5 to v6 with nobody reading the changelog (resurgent#160); majors get their own PR and a deliberate look.",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["dependencies", "major"]
+    },
+    {
+      "description": "Never bump the interpreter floor. Raising requires-python is a support decision, not a dependency update.",
+      "matchManagers": ["pep621"],
+      "matchDepTypes": ["requires-python"],
+      "enabled": false
+    },
+    {
+      "description": "Python dev and build tooling. Covers both layouts in use: [project.optional-dependencies] (unifi-mcp, unraid-mcp) and [dependency-groups] (consistency-check).",
+      "matchManagers": ["pep621"],
+      "matchDepTypes": [
+        "project.optional-dependencies",
+        "dependency-groups",
+        "tool.uv.dev-dependencies",
+        "tool.pdm.dev-dependencies",
+        "build-system.requires"
+      ],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "python dev dependencies",
+      "automerge": true
+    },
+    {
+      "description": "Python runtime dependencies. Kept out of the dev group so a shipped bump is never hidden behind a test-only one -- the split unifi-mcp, unraid-mcp, and gandi-mcp already made by hand.",
+      "matchManagers": ["pep621"],
+      "matchDepTypes": ["project.dependencies", "tool.uv.sources"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "python runtime dependencies",
+      "automerge": true
+    },
+    {
+      "description": "requirements.txt repos (resurgent) have no manifest depTypes to split on, so they group as one.",
+      "matchManagers": ["pip_requirements", "pip-compile"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "python requirements",
+      "automerge": true
+    },
+    {
+      "description": "GitHub Actions. helpers:pinGitHubActionDigests keeps the SHA-pin-with-version-comment shape the workflow convention requires.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin"],
+      "groupName": "github actions",
+      "automerge": true
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "npm dependencies",
+      "automerge": true
+    },
+    {
+      "matchManagers": ["dockerfile", "docker-compose"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin"],
+      "groupName": "docker images",
+      "automerge": true
+    },
+    {
+      "matchManagers": ["pre-commit"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "pre-commit hooks",
+      "automerge": true
+    },
+    {
+      "description": "Terraform and OpenTofu providers are never automerged regardless of update type. A provider bump reaches every repo in the org through the apply pipeline, and the plan output is the review.",
+      "matchManagers": ["terraform", "terraform-version", "tflint-plugin"],
+      "groupName": "terraform providers",
+      "automerge": false
+    },
+    {
+      "description": "Astral tools move fast at 0.x and a minor there can change lint or type behavior. Still automerged -- the failure mode is a red Lint & Format or Type Check on the PR, which blocks the merge rather than landing it.",
+      "matchPackageNames": ["ruff", "ty", "uv"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "python dev dependencies",
+      "automerge": true
+    }
+  ]
+}
