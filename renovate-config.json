@@ -10,6 +10,10 @@
     ":semanticCommits",
     "helpers:pinGitHubActionDigests"
   ],
+  "pre-commit": {
+    "description": "The pre-commit manager is disabled by default and must be opted into, or the pre-commit packageRule below never matches anything.",
+    "enabled": true
+  },
   "timezone": "Etc/UTC",
   "schedule": ["* 0-5 * * 1"],
   "labels": ["dependencies"],
