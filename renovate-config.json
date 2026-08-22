@@ -43,7 +43,7 @@
   },
   "packageRules": [
     {
-      "description": "Majors are never automerged. A grouped merge carried docker/metadata-action v5 to v6 with nobody reading the changelog (resurgent#160); majors get their own PR and a deliberate look. addLabels, not labels, so a later matching rule cannot drop the marker.",
+      "description": "Majors are never automerged. A grouped merge once carried docker/metadata-action v5 to v6 with nobody reading the changelog; majors get their own PR and a deliberate look. addLabels, not labels, so a later matching rule cannot drop the marker.",
       "matchUpdateTypes": ["major"],
       "automerge": false,
       "addLabels": ["major"]
@@ -77,7 +77,7 @@
       "automerge": true
     },
     {
-      "description": "requirements.txt repos (resurgent) have no manifest depTypes to split on, so they group as one.",
+      "description": "requirements.txt repos have no manifest depTypes to split on, so they group as one.",
       "matchManagers": ["pip_requirements", "pip-compile"],
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "python requirements",
@@ -116,7 +116,7 @@
       "automerge": false
     },
     {
-      "description": "Terraform providers and the tflint plugins. Scoped to the provider depTypes because the terraform manager emits two dozen, most of which are not providers. Grouped for minor and patch only — a provider major must not arrive bundled with routine bumps, which is the resurgent#160 shape. Never automerged: a provider bump reaches every repo in the org through tofu-apply, and the plan output is the review.",
+      "description": "Terraform providers and the tflint plugins. Scoped to the provider depTypes because the terraform manager emits two dozen, most of which are not providers. Grouped for minor and patch only — a provider major must not arrive bundled with routine bumps, which is the shape that caused the metadata-action incident. Never automerged: a provider bump reaches every repo in the org through tofu-apply, and the plan output is the review.",
       "matchManagers": ["terraform", "tflint-plugin"],
       "matchDepTypes": ["provider", "required_provider"],
       "matchUpdateTypes": ["minor", "patch"],
